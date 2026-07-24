@@ -272,8 +272,8 @@
 
             <Grid ColumnDefinitions="Auto,*" Margin="10,10,0,10">
               <CheckBox Grid.Column="0" IsChecked="{Binding AnimeJaNaiConf.GpuSubtitles}" Content="GPU Subtitle Rendering (Experimental)" />
-              <TextBlock Grid.Column="1" Classes="help" Margin="20,0,0,0" TextWrapping="Wrap" xml:space="preserve"><Bold>On — best quality.</Bold> Subtitles are drawn as a separate, full-resolution overlay (<Run FontFamily="Consolas">blend-subtitles=no</Run>) for the sharpest text, with glyph rasterization, blur and compositing offloaded to the GPU and a worker thread rendering subtitles ahead. This keeps typesetting-heavy releases smooth where the plain CPU path drops frames. It is new and <Bold>experimental</Bold>, so it can cost some performance and may still have bugs.
-<Bold>Off (default) — best performance and stability.</Bold> Subtitles are blended into the video frame and scaled along with it (<Run FontFamily="Consolas">blend-subtitles=video</Run>), which avoids the costly full-resolution subtitle overlay and the experimental GPU path entirely. Text is slightly softer, but playback is the fastest and most reliable. Recommended unless you specifically want sharper subtitles and have performance to spare.</TextBlock>
+              <TextBlock Grid.Column="1" Classes="help" Margin="20,0,0,0" TextWrapping="Wrap" xml:space="preserve"><Bold>On — sharper subtitles.</Bold> Rendered at your display resolution instead of being baked into the video, so text stays crisp and isn't distorted by the anime upscaler. Experimental: may cost some performance or have bugs.
+<Bold>Off (default) — fastest and most stable.</Bold> Subtitles are baked into the video. Best for most users.</TextBlock>
             </Grid>
 
             <TextBlock Margin="10,0,0,10" Classes="help" TextWrapping="Wrap">Subtitle rendering changes take effect after you restart the player.</TextBlock>
