@@ -700,6 +700,10 @@ chain_2_rife=no";
         // Keep CONFIG_VERSION, the current default, and the historical-defaults set in sync with
         // aji_conf.cpp in the animejanai-inference repo (the native filter's conf loader).
         private const int CONFIG_VERSION = 3;
+        // [global] sub_render_mode value that selects the experimental GPU subtitle path. The
+        // settings themselves live in the [subs-gpu] profile of the managed mpv-animejanai.conf,
+        // so they can change with the player without a Manager release.
+        private const string SUB_RENDER_MODE_GPU = "gpu";
         // TRT 11: strongly-typed is the default (--stronglyTyped is a no-op), and the native filter's
         // sanitizer strips --inputIOFormats/--outputIOFormats/--tacticSources anyway (types come from
         // the network; the cuDNN/cuBLAS tactic sources are gone). Only the builder optimization level,
@@ -750,6 +754,14 @@ chain_2_rife=no";
             {
                 animeJaNaiConf.DefaultSlot = defaultSlot;
             }
+
+            // Subtitle rendering mode: "gpu" opts into the experimental GPU subtitle path
+            // (the [subs-gpu] profile in mpv-animejanai.conf, applied at startup by
+            // scripts/animejanai_backend.lua). Anything else (including the absent key)
+            // means the stable defaults baked into the [animejanai] profile.
+            animeJaNaiConf.GpuSubtitles = SUB_RENDER_MODE_GPU.Equals(
+                parser.GetValue("global", "sub_render_mode", "").Trim(),
+                StringComparison.OrdinalIgnoreCase);
 
             // config_version drives migrations (absent => 1, the pre-versioning schema).
             int.TryParse(parser.GetValue("global", "config_version", "1"), out var configVersion);
@@ -1023,6 +1035,12 @@ chain_2_rife=no";
             if (conf.DefaultSlot is int defaultSlot)
             {
                 parser.SetValue("global", "default_slot", defaultSlot.ToString(ENGLISH_CULTURE));
+            }
+            // Write-minimal: only persist the subtitle mode when the experimental GPU path is
+            // enabled (absent => the stable [animejanai] subtitle defaults apply).
+            if (conf.GpuSubtitles)
+            {
+                parser.SetValue("global", "sub_render_mode", SUB_RENDER_MODE_GPU);
             }
             // Write-minimal: only persist trt_engine_settings when it differs from the current
             // default, so future default changes apply automatically to users who didn't customize.
@@ -1300,7 +1318,8 @@ chain_2_rife=no";
                 this.WhenAnyValue(
                     x => x.QualitySharp,
                     x => x.BalancedSharp,
-                    x => x.PerformanceSharp).Subscribe(x =>
+                    x => x.PerformanceSharp,
+                    x => x.GpuSubtitles).Subscribe(x =>
                     {
                         Vm?.WriteAnimeJaNaiConf();
                     });
@@ -1563,6 +1582,16 @@ chain_2_rife=no";
         {
             get => _backendAutoFallback;
             set => this.RaiseAndSetIfChanged(ref _backendAutoFallback, value);
+        }
+
+        // Experimental GPU subtitle rendering ([global] sub_render_mode=gpu). Off => the player
+        // uses the stable subtitle defaults from the managed [animejanai] profile.
+        private bool _gpuSubtitles;
+        [DataMember]
+        public bool GpuSubtitles
+        {
+            get => _gpuSubtitles;
+            set => this.RaiseAndSetIfChanged(ref _gpuSubtitles, value);
         }
 
         public Backend SelectedBackend => DirectMlSelected ? Backend.DirectML : Backend.TensorRT;

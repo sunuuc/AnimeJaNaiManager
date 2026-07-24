@@ -270,6 +270,14 @@
               </Border>
             </StackPanel>
 
+            <Grid ColumnDefinitions="Auto,*" Margin="10,10,0,10">
+              <CheckBox Grid.Column="0" IsChecked="{Binding AnimeJaNaiConf.GpuSubtitles}" Content="GPU Subtitle Rendering (Experimental)" />
+              <TextBlock Grid.Column="1" Classes="help" Margin="20,0,0,0" TextWrapping="Wrap" xml:space="preserve"><Bold>On — sharper subtitles.</Bold> Rendered at your display resolution instead of being baked into the video, so text stays crisp and isn't distorted by the anime upscaler. Experimental: may cost some performance or have bugs.
+<Bold>Off (default) — fastest and most stable.</Bold> Subtitles are baked into the video. Best for most users.</TextBlock>
+            </Grid>
+
+            <TextBlock Margin="10,0,0,10" Classes="help" TextWrapping="Wrap">Subtitle rendering changes take effect after you restart the player.</TextBlock>
+
           </StackPanel>
           <StackPanel Orientation="Horizontal" Grid.Row="0" HorizontalAlignment="Right" VerticalAlignment="Top">
             <Button Margin="10,0,10,0" Click="ImportFullConfButtonClick">
