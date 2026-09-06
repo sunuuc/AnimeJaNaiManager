@@ -12,6 +12,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Apply native Simplified Chinese source
+        shell: pwsh
+        run: ./scripts/ApplyNativeChinese.ps1
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
         with:
