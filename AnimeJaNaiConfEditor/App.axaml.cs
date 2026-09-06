@@ -33,15 +33,19 @@ namespace AnimeJaNaiConfEditor
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                desktop.MainWindow = new MainWindow
+                // Build and localize the entire window before handing it to the desktop
+                // lifetime. This prevents the English XAML from ever being presented for a
+                // frame before the zh-CN overlay runs.
+                var mainWindow = new MainWindow
                 {
                     DataContext = new MainWindowViewModel(),
                 };
+                ChineseLocalization.Apply(mainWindow);
+                desktop.MainWindow = mainWindow;
 
-                // Personal zh-CN build: keep translating the active visual tree.  A short
-                // periodic pass also catches FluentAvalonia dialogs and status strings that
-                // are created/updated after startup, while SetCurrentValue in the translator
-                // keeps the original Avalonia bindings intact.
+                // Keep a light periodic pass only for visual content created after startup
+                // (FluentAvalonia dialogs and late-bound status text). The main window itself
+                // has already been translated synchronously before its first render.
                 _chineseLocalizationTimer = new DispatcherTimer
                 {
                     Interval = TimeSpan.FromMilliseconds(350),
@@ -54,8 +58,6 @@ namespace AnimeJaNaiConfEditor
                     }
                 };
                 _chineseLocalizationTimer.Start();
-
-                Dispatcher.UIThread.Post(() => ChineseLocalization.Apply(desktop.MainWindow));
 
                 // When another launch (e.g. a repeated Ctrl+E from mpv) signals this instance,
                 // bring the existing window to the front instead of opening a new one.
