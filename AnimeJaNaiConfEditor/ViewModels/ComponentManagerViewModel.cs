@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace AnimeJaNaiConfEditor.ViewModels
@@ -30,7 +31,7 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
         public string SizeText => $"{Bytes / 1048576:N0} MB";
 
-        public string StateText => Installed ? "installed" : "optional";
+        public string StateText => Installed ? "已安装" : "可选";
 
         // accent-tagged in the UI instead of pre-checked: recommendations should
         // be visible, not pre-decided
@@ -38,29 +39,29 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
         public string Title => Name switch
         {
-            "trt-runtime" => "TensorRT runtime",
-            "rife" => "RIFE interpolation models",
-            "trt-ptx" => "TensorRT kernels: other NVIDIA GPUs",
-            _ when Name.StartsWith("trt-sm") => $"TensorRT kernels: {SmFamily(Name[6..])}",
+            "trt-runtime" => "TensorRT 运行库",
+            "rife" => "RIFE 补帧模型",
+            "trt-ptx" => "TensorRT 内核：其他 NVIDIA GPU",
+            _ when Name.StartsWith("trt-sm") => $"TensorRT 内核：{SmFamily(Name[6..])}",
             _ => Name,
         };
 
         public string Description => Name switch
         {
-            "trt-runtime" => "The fastest upscaling engine, for NVIDIA GPUs. Without it, NVIDIA users fall back to the slower DirectML engine.",
-            "rife" => "Frame interpolation (e.g. 24 → 48 fps). Not needed if you only upscale.",
-            "trt-ptx" => "Fallback kernels for NVIDIA GPUs without a dedicated kernel pack. First engine build is slower.",
-            _ when Name.StartsWith("trt-sm") => "Engine-builder kernels matched to this GPU generation. Only needed on these GPUs.",
+            "trt-runtime" => "NVIDIA GPU 上最快的超分后端。未安装时，NVIDIA 用户将回退到速度更慢的 DirectML 后端。",
+            "rife" => "视频补帧（例如 24 → 48 fps）。如果只使用超分则不需要。",
+            "trt-ptx" => "用于没有专用内核包的 NVIDIA GPU 的后备内核。首次构建引擎会更慢。",
+            _ when Name.StartsWith("trt-sm") => "与该代 GPU 匹配的引擎构建内核，仅对应 GPU 需要安装。",
             _ => "",
         };
 
         private static string SmFamily(string sm) => sm switch
         {
-            "75" => "GeForce RTX 20 series (Turing)",
-            "80" or "86" => "GeForce RTX 30 series (Ampere)",
-            "89" => "GeForce RTX 40 series (Ada)",
+            "75" => "GeForce RTX 20 系列（Turing）",
+            "80" or "86" => "GeForce RTX 30 系列（Ampere）",
+            "89" => "GeForce RTX 40 系列（Ada）",
             "90" => "Hopper",
-            "100" or "120" => "GeForce RTX 50 series (Blackwell)",
+            "100" or "120" => "GeForce RTX 50 系列（Blackwell）",
             _ => $"sm{sm}",
         };
     }
@@ -86,7 +87,7 @@ namespace AnimeJaNaiConfEditor.ViewModels
         // so the Profiles tab can re-derive its component awareness.
         public event Action? Refreshed;
 
-        private string _gpuText = "Detecting hardware...";
+        private string _gpuText = "正在检测硬件……";
         public string GpuText
         {
             get => _gpuText;
@@ -133,13 +134,13 @@ namespace AnimeJaNaiConfEditor.ViewModels
         {
             if (!UpdaterFound)
             {
-                GpuText = "AnimeJaNaiUpdater.exe not found next to the install - component management unavailable.";
+                GpuText = "安装目录中未找到 AnimeJaNaiUpdater.exe，无法管理组件。";
                 LoadFailed = true;
                 return;
             }
 
             IsBusy = true;
-            StatusLine = "Checking installed components...";
+            StatusLine = "正在检查已安装组件……";
             try
             {
                 var (exitCode, output) = await RunUpdaterAsync("--components --json", null);
@@ -153,8 +154,8 @@ namespace AnimeJaNaiConfEditor.ViewModels
                 var gpu = root.GetProperty("gpu");
                 bool nvidia = gpu.GetProperty("nvidia").GetBoolean();
                 GpuText = nvidia
-                    ? $"GPU: {gpu.GetProperty("name").GetString()}"
-                    : "GPU: no NVIDIA device detected — the built-in DirectML engine covers AMD and Intel GPUs";
+                    ? $"GPU：{gpu.GetProperty("name").GetString()}"
+                    : "GPU：未检测到 NVIDIA 设备；内置 DirectML 后端可用于 AMD 和 Intel GPU";
                 GpuNvidia = nvidia;
 
                 Packs.Clear();
@@ -191,14 +192,14 @@ namespace AnimeJaNaiConfEditor.ViewModels
                 string? mismatch = root.TryGetProperty("version_mismatch", out var mm)
                     ? mm.GetString() : null;
                 StatusLine = mismatch is not null
-                    ? mismatch + " Update first, then manage components."
+                    ? TranslateVersionMismatch(mismatch) + " 请先更新，再管理组件。"
                     : "";
                 LoadFailed = false;
             }
             catch (Exception ex)
             {
-                GpuText = "Could not load component information.";
-                StatusLine = ex.Message;
+                GpuText = "无法读取组件信息。";
+                StatusLine = TranslateUpdaterText(ex.Message);
                 LoadFailed = true;
             }
             finally
@@ -235,7 +236,7 @@ namespace AnimeJaNaiConfEditor.ViewModels
             }
             if (toInstall.Count == 0 && toRemove.Count == 0)
             {
-                StatusLine = "Nothing to change.";
+                StatusLine = "没有需要更改的内容。";
                 return;
             }
 
@@ -245,24 +246,24 @@ namespace AnimeJaNaiConfEditor.ViewModels
                 foreach (var name in toInstall)
                 {
                     var (exitCode, output) = await RunUpdaterAsync($"--install {name}",
-                        line => StatusLine = $"{name}: {line}");
+                        line => StatusLine = $"{name}：{TranslateUpdaterText(line)}");
                     if (exitCode != 0)
                     {
-                        StatusLine = $"Installing {name} failed: {LastLine(output)}";
+                        StatusLine = $"安装 {name} 失败：{TranslateUpdaterText(LastLine(output))}";
                         return;
                     }
                 }
                 foreach (var name in toRemove)
                 {
-                    StatusLine = $"Removing {name}...";
+                    StatusLine = $"正在移除 {name}……";
                     var (exitCode, output) = await RunUpdaterAsync($"--remove {name}", null);
                     if (exitCode != 0)
                     {
-                        StatusLine = $"Removing {name} failed: {LastLine(output)}";
+                        StatusLine = $"移除 {name} 失败：{TranslateUpdaterText(LastLine(output))}";
                         return;
                     }
                 }
-                StatusLine = "Done.";
+                StatusLine = "完成。";
             }
             finally
             {
@@ -278,7 +279,34 @@ namespace AnimeJaNaiConfEditor.ViewModels
 
         private static string LastLine(string s) =>
             s.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-             .LastOrDefault() ?? "unknown error";
+             .LastOrDefault() ?? "未知错误";
+
+        private static string TranslateVersionMismatch(string message)
+        {
+            var match = Regex.Match(message,
+                @"^Installed package is (.+?) but the published packs are for (.+?)\.?$");
+            if (match.Success)
+            {
+                return $"当前安装包版本为 {match.Groups[1].Value}，但已发布的组件包对应 {match.Groups[2].Value}。";
+            }
+            return TranslateUpdaterText(message);
+        }
+
+        private static string TranslateUpdaterText(string message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+                return message;
+
+            string translated = AnimeJaNaiConfEditor.ChineseLocalization.Translate(message);
+            translated = translated.Replace("Download complete", "下载完成", StringComparison.Ordinal)
+                                   .Replace("Downloading", "正在下载", StringComparison.Ordinal)
+                                   .Replace("Installing", "正在安装", StringComparison.Ordinal)
+                                   .Replace("Removing", "正在移除", StringComparison.Ordinal)
+                                   .Replace("Done", "完成", StringComparison.Ordinal)
+                                   .Replace("failed", "失败", StringComparison.OrdinalIgnoreCase)
+                                   .Replace("error", "错误", StringComparison.OrdinalIgnoreCase);
+            return translated;
+        }
 
         // Runs the updater hidden; onLine (marshalled to the UI thread) sees each output
         // line live, the full output is returned for error reporting.
