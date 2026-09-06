@@ -24,21 +24,32 @@ jobs:
         shell: pwsh
         run: ./scripts/ApplyNativeChinese.ps1
 
-      - name: Validate localized CSharp source
+      - name: Finalize and validate localized source
         shell: pwsh
         run: |
-          $path = 'AnimeJaNaiConfEditor/Views/MainWindow.axaml.cs'
-          $src = Get-Content $path -Raw
+          $csPath = 'AnimeJaNaiConfEditor/Views/MainWindow.axaml.cs'
+          $cs = Get-Content $csPath -Raw
           # A translated string followed by the original concatenation operator can
           # temporarily produce '+ +'. Normalize that source-only artifact.
-          $src = $src.Replace('+ +', '+')
-          Set-Content -Path $path -Value $src -Encoding utf8
+          $cs = $cs.Replace('+ +', '+')
+          Set-Content -Path $csPath -Value $cs -Encoding utf8
+
+          $xamlPath = 'AnimeJaNaiConfEditor/Views/MainWindow.axaml'
+          $xaml = Get-Content $xamlPath -Raw
+          $xaml = $xaml.Replace('> (Default)<', '>（默认）<')
+          Set-Content -Path $xamlPath -Value $xaml -Encoding utf8
 
           # Guard against the old unsafe whole-source replacement failure mode.
           $all = Get-ChildItem AnimeJaNaiConfEditor -Recurse -Filter *.cs | ForEach-Object { Get-Content $_.FullName -Raw }
           $joined = $all -join "`n"
           foreach ($bad in @('View模型Base', '取消lationToken', 'SetLast错误')) {
             if ($joined.Contains($bad)) { throw "Unsafe localization touched a code identifier: $bad" }
+          }
+
+          # These ordinary English labels must never survive into this personal build.
+          $ui = (Get-Content $xamlPath -Raw) + "`n" + (Get-Content $csPath -Raw)
+          foreach ($badUi in @('> (Default)<', '>Global Settings<', 'Header="Profiles"', 'Header="Components"', '>Run Benchmarks<', '>Submit to Catalog<')) {
+            if ($ui.Contains($badUi)) { throw "Visible English remains: $badUi" }
           }
 
       - name: Setup .NET 10
