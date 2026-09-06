@@ -141,7 +141,7 @@ foreach ($rel in $targets) {
 
     # Dynamic StringFormat labels in XAML.
     $text = $text.Replace('StringFormat=Chain {0}', 'StringFormat=处理链 {0}')
-                .Replace('StringFormat=Model {0}', 'StringFormat=模型 {0}')
+    $text = $text.Replace('StringFormat=Model {0}', 'StringFormat=模型 {0}')
     Set-Content -Path $path -Value $text -Encoding utf8
 }
 
