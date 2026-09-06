@@ -1,0 +1,36 @@
+name: zh-CN Build
+
+on:
+  push:
+    branches: [zh-CN]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Publish Windows x64
+        run: dotnet publish AnimeJaNaiConfEditor/AnimeJaNaiConfEditor.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o publish
+
+      - name: Stage runtime files
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path staging | Out-Null
+          Copy-Item publish\*.exe staging\
+          Copy-Item publish\*.dll staging\
+          Compress-Archive -Path staging\* -DestinationPath AnimeJaNaiManager-zh-CN-win-x64.zip -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnimeJaNaiManager-zh-CN-win-x64
+          path: AnimeJaNaiManager-zh-CN-win-x64.zip
+          if-no-files-found: error
