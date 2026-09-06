@@ -33,19 +33,31 @@ namespace AnimeJaNaiConfEditor
 
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                // Build and localize the entire window before handing it to the desktop
-                // lifetime. This prevents the English XAML from ever being presented for a
-                // frame before the zh-CN overlay runs.
+                // Some Avalonia controls/bindings do not materialize until the Window is
+                // actually attached/opened. Keep the whole native window invisible until
+                // that has happened and two zh-CN passes have completed. The first visible
+                // frame is therefore Chinese instead of briefly exposing the English XAML.
                 var mainWindow = new MainWindow
                 {
                     DataContext = new MainWindowViewModel(),
+                    Opacity = 0,
                 };
-                ChineseLocalization.Apply(mainWindow);
+
+                mainWindow.Opened += (_, _) =>
+                {
+                    ChineseLocalization.Apply(mainWindow);
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        ChineseLocalization.Apply(mainWindow);
+                        mainWindow.Opacity = 1;
+                    });
+                };
+
                 desktop.MainWindow = mainWindow;
 
-                // Keep a light periodic pass only for visual content created after startup
-                // (FluentAvalonia dialogs and late-bound status text). The main window itself
-                // has already been translated synchronously before its first render.
+                // Keep a light periodic pass for visual content created/updated after startup
+                // (FluentAvalonia dialogs and late-bound status text). Startup itself no longer
+                // relies on this timer, so there is no English-to-Chinese flash.
                 _chineseLocalizationTimer = new DispatcherTimer
                 {
                     Interval = TimeSpan.FromMilliseconds(350),
