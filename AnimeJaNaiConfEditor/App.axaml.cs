@@ -15,6 +15,8 @@ namespace AnimeJaNaiConfEditor
 {
     public partial class App : Application
     {
+        private DispatcherTimer? _chineseLocalizationTimer;
+
         public override void Initialize()
         {
             AvaloniaXamlLoader.Load(this);
@@ -35,6 +37,25 @@ namespace AnimeJaNaiConfEditor
                 {
                     DataContext = new MainWindowViewModel(),
                 };
+
+                // Personal zh-CN build: keep translating the active visual tree.  A short
+                // periodic pass also catches FluentAvalonia dialogs and status strings that
+                // are created/updated after startup, while SetCurrentValue in the translator
+                // keeps the original Avalonia bindings intact.
+                _chineseLocalizationTimer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(350),
+                };
+                _chineseLocalizationTimer.Tick += (_, _) =>
+                {
+                    foreach (var window in desktop.Windows)
+                    {
+                        ChineseLocalization.Apply(window);
+                    }
+                };
+                _chineseLocalizationTimer.Start();
+
+                Dispatcher.UIThread.Post(() => ChineseLocalization.Apply(desktop.MainWindow));
 
                 // When another launch (e.g. a repeated Ctrl+E from mpv) signals this instance,
                 // bring the existing window to the front instead of opening a new one.
