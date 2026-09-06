@@ -12,9 +12,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare native Chinese localizer
+        shell: pwsh
+        run: |
+          $path = 'scripts/ApplyNativeChinese.ps1'
+          $src = Get-Content $path -Raw
+          $src = $src.Replace('function Apply-ExactSourceReplacements([string]$rel, [ordered]$replacements)', 'function Apply-ExactSourceReplacements([string]$rel, $replacements)')
+          Set-Content -Path $path -Value $src -Encoding utf8
+
       - name: Apply native Simplified Chinese source
         shell: pwsh
         run: ./scripts/ApplyNativeChinese.ps1
+
+      - name: Validate localized CSharp source
+        shell: pwsh
+        run: |
+          $path = 'AnimeJaNaiConfEditor/Views/MainWindow.axaml.cs'
+          $src = Get-Content $path -Raw
+          # A translated string followed by the original concatenation operator can
+          # temporarily produce '+ +'. Normalize that source-only artifact.
+          $src = $src.Replace('+ +', '+')
+          Set-Content -Path $path -Value $src -Encoding utf8
+
+          # Guard against the old unsafe whole-source replacement failure mode.
+          $all = Get-ChildItem AnimeJaNaiConfEditor -Recurse -Filter *.cs | ForEach-Object { Get-Content $_.FullName -Raw }
+          $joined = $all -join "`n"
+          foreach ($bad in @('View模型Base', '取消lationToken', 'SetLast错误')) {
+            if ($joined.Contains($bad)) { throw "Unsafe localization touched a code identifier: $bad" }
+          }
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
