@@ -37,7 +37,14 @@ jobs:
           $xamlPath = 'AnimeJaNaiConfEditor/Views/MainWindow.axaml'
           $xaml = Get-Content $xamlPath -Raw
           $xaml = $xaml.Replace('> (Default)<', '>（默认）<')
+          # Keep the RIFE explanation accurate when a pre-upscale resize is configured.
+          $xaml = $xaml.Replace('先在源分辨率下运行 RIFE，再进行超分（更快，推荐）。取消勾选则先超分，再对超分后的画面补帧。', '在超分前运行 RIFE（通常更快，推荐）。如果设置了“超分前缩放高度”，RIFE 会在缩放后的分辨率运行。取消勾选则先超分，再对超分后的画面补帧。')
           Set-Content -Path $xamlPath -Value $xaml -Encoding utf8
+
+          $vmPath = 'AnimeJaNaiConfEditor/ViewModels/MainWindowViewModel.cs'
+          $vm = Get-Content $vmPath -Raw
+          $vm = $vm.Replace('最低建议 GPU：', '最低建议显卡：')
+          Set-Content -Path $vmPath -Value $vm -Encoding utf8
 
           # Guard against the old unsafe whole-source replacement failure mode.
           $all = Get-ChildItem AnimeJaNaiConfEditor -Recurse -Filter *.cs | ForEach-Object { Get-Content $_.FullName -Raw }
